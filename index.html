@@ -171,7 +171,7 @@
 
     <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <span>Data: TradingView (quotes, indicators, ratings, news, calendar) &middot; NBP (gold fixing) &middot; ECB via Frankfurter (FX)</span>
-      <span>Private dashboard &middot; not financial advice</span>
+      <span>Private dashboard &middot; AES-256 encrypted &middot; not financial advice</span>
     </div>
     <div class="disclaimer">
       <strong>These are levels, not instructions.</strong> Pivot points, moving averages, and support/resistance are where traders cluster orders &mdash; price often reacts near them, but "often" is not "reliably." No chart level predicts central-bank surprises, CPI prints, or geopolitics &mdash; the things that actually move gold. Roughly 1 day in 3 closes outside the 68% band by design. Nothing here is financial advice; there is no free Twitter/X data feed, so news comes from TradingView's aggregated feed.
@@ -181,6 +181,33 @@
 
 <script>
 "use strict";
+// ---------- audible alert fallback (works even when OS banners are blocked) ----------
+window.__mtBeep = function () {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const play = (freq, t0, dur) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + dur);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + dur + 0.05);
+    };
+    play(880, 0, 0.18); play(1320, 0.22, 0.25);
+  } catch (e) {}
+};
+window.__mtFlash = function (msg) {
+  try {
+    const orig = document.title;
+    let n = 0;
+    const iv = setInterval(() => {
+      document.title = (n % 2 === 0) ? ("\u26A0 " + msg) : orig;
+      if (++n > 9) { clearInterval(iv); document.title = orig; }
+    }, 900);
+  } catch (e) {}
+};
+
 const LS_KEY = "goldTrackerLivePoints";
 const GRAMS_PER_OZ = 31.1034768;
 const BASKET = { EUR: 0.576, JPY: 0.136, GBP: 0.119, CAD: 0.091, SEK: 0.042, CHF: 0.036 };
@@ -731,6 +758,7 @@ init();
         if (prev[sym] !== undefined && prev[sym] !== state) {
           log.unshift({ t: Date.now(), name, state, lean });
           changed = true;
+          window.__mtBeep && window.__mtBeep(); window.__mtFlash && window.__mtFlash(name + " " + state);
           new Notification(name + " — indicator signal changed", {
             body: "Consensus is now " + state + " (" + lean.toFixed(2) + "). Indicator signal, not buy/sell advice.",
             tag: "sig-" + sym });
