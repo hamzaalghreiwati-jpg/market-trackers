@@ -108,8 +108,8 @@
     <div class="tv-embed" style="height:420px;margin-bottom:14px"><div id="tv_brent" style="height:100%"></div></div>
 
     <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <span>Data: TradingView (quotes, indicator consensus, charts)</span>
-      <span>Private dashboard &middot; AES-256 encrypted &middot; not financial advice</span>
+      <span>Data: TradingView (quotes, indicator consensus, charts) &middot; BBC &amp; CNN via Jina Reader (headlines)</span>
+      <span>Not financial advice</span>
     </div>
     <div class="disclaimer">
       <strong>Short-term vs long-term.</strong> Each card shows two independent consensus reads: short-term (1h/4h/daily indicators &mdash; drives the alerts) and long-term (weekly/monthly indicators &mdash; the slow trend). When they disagree &mdash; e.g. long-term uptrend but short-term bearish &mdash; that is a pullback within a trend or the start of a reversal, and no indicator can tell you which. Neither timeframe is a prediction or a suggestion; both describe what already happened at different speeds.
@@ -272,10 +272,25 @@ function checkSignals(rows) {
 
 function updateNotifUI() {
   const btn = document.getElementById("notifBtn"), st = document.getElementById("sigStatus");
-  if (!("Notification" in window)) { btn.disabled = true; st.textContent = "This browser does not support notifications."; return; }
-  if (Notification.permission === "granted") { btn.disabled = true; btn.textContent = "Alerts enabled"; st.textContent = "Watching all 19 commodities — from any dashboard page you have open."; }
-  else if (Notification.permission === "denied") { btn.disabled = true; st.textContent = "Notifications blocked in browser settings."; }
-  else { st.textContent = "Alerts fire only while this page is open."; }
+  if (!("Notification" in window)) { btn.disabled = true; st.textContent = "This browser does not support notifications (iPhone/iPad Safari does not allow web notifications)."; return; }
+  if (Notification.permission === "granted") { btn.disabled = false; btn.textContent = "Send test alert"; st.textContent = "Alerts enabled — watching all 19 commodities from any open dashboard page."; }
+  else if (Notification.permission === "denied") { btn.disabled = true; st.textContent = "Blocked — click the lock icon in the address bar, allow Notifications, then reload."; }
+  else { btn.textContent = "Enable browser alerts"; st.textContent = "Alerts fire only while a dashboard page is open."; }
+}
+
+async function notifBtnClick() {
+  const st = document.getElementById("sigStatus");
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification("Test alert — notifications working", {
+      body: "You'll get one like this when any of the 19 commodities' indicator consensus flips bullish or bearish. Signal, not advice.",
+      tag: "sig-test" });
+    st.textContent = "Test alert sent " + new Date().toLocaleTimeString() + " — check your notifications.";
+  } else {
+    await Notification.requestPermission();
+    updateNotifUI();
+    if (Notification.permission === "granted") notifBtnClick();
+  }
 }
 
 async function fetchHeadlines() {
@@ -360,10 +375,7 @@ async function tick(first) {
       document.getElementById("status").style.display = "none";
       document.getElementById("app").style.display = "block";
       renderLog(); updateNotifUI(); embedCharts(); mountJarvis();
-      document.getElementById("notifBtn").addEventListener("click", async () => {
-        await Notification.requestPermission();
-        updateNotifUI();
-      });
+      document.getElementById("notifBtn").addEventListener("click", notifBtnClick);
       document.getElementById("jarvisBtn").addEventListener("click", mountJarvis);
     }
   } catch (e) {
