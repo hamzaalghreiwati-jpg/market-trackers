@@ -67,6 +67,29 @@
   .tk .t { color: var(--accent); font-weight: 600; margin-right: 6px; }
   .tk .r { color: var(--muted); }
 </style>
+
+<style>
+/* visual pass: depth, glow, glass */
+body { background:
+  radial-gradient(1100px 700px at 85% -5%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+  radial-gradient(900px 600px at -10% 110%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 55%),
+  var(--bg); }
+.card { background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0) 45%), var(--card); border-radius: 16px; }
+.section-title { border-left: 3px solid var(--accent); padding-left: 9px; }
+h1 { text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 30%, transparent); }
+.card .value { text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 20%, transparent); }
+button.act { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #fff 14%)); box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 35%, transparent); }
+.sig.bull { box-shadow: 0 0 16px rgba(76,175,125,.25); }
+.sig.bear { box-shadow: 0 0 16px rgba(224,92,92,.25); }
+.tabs { background: rgba(255,255,255,.02); }
+.tabs a.active { box-shadow: inset 0 0 14px color-mix(in srgb, var(--accent) 22%, transparent); }
+.tv-embed { box-shadow: 0 8px 28px rgba(0,0,0,.35); }
+#pulse { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, var(--card)), var(--card) 60%); }
+.ticker-wrap { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, var(--card)), var(--card) 50%); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #2a2f3c; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+</style>
 </head>
 <body>
 <div class="wrap">
