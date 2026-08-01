@@ -112,9 +112,23 @@
         </div>
         <div class="sub" id="dDrivers" style="margin:10px 0 6px;line-height:1.6"></div>
         <div class="sub" id="dConsensus" style="margin-bottom:12px"></div>
+        <div class="charts2" style="margin-bottom:12px">
+          <div class="tv-embed" style="height:360px;background:var(--bg)"><div id="dGauge" style="height:100%"></div></div>
+          <div class="card" style="box-shadow:none">
+            <div class="label">Indicator verdicts <span class="band">1-hour timeframe</span></div>
+            <table id="dInd" style="margin-top:6px"><tbody><tr><td class="band">Loading indicators&hellip;</td></tr></tbody></table>
+          </div>
+        </div>
         <div class="tv-embed" style="height:440px"><div id="dChart" style="height:100%"></div></div>
         <div class="sub" style="margin-top:10px">Chart: TradingView, 30-minute candles. Consensus describes the current trend, not the next move. Not financial advice.</div>
       </div>
+    </div>
+
+    <div class="section-title">Paper signal scorecard <span class="pill">simulation &mdash; audits the signals with zero money at risk</span></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="sub" style="margin-bottom:10px">Every bullish signal opens a <em>hypothetical</em> long at that moment's price; every bearish signal a hypothetical short. When the signal ends, the paper trade closes and the result is recorded here. This is how you find out whether the signals deserve any trust &mdash; before a single dirham touches them. Record lives on this device. <button class="act" id="paperReset" style="padding:4px 12px;font-size:12px;margin-left:8px">Reset record</button></div>
+      <table id="paperTable"><thead><tr><th>Asset</th><th>Open paper position</th><th>Unrealized</th><th>Closed trades</th><th>Wins</th><th>Cumulative %</th></tr></thead><tbody></tbody></table>
+      <div class="sub" id="paperTotals" style="margin-top:10px"></div>
     </div>
 
     <div class="section-title">Signal log <span class="pill">stored on this device</span></div>
@@ -328,6 +342,52 @@ function renderLog() {
     "<td class='band'>" + e.lean.toFixed(2) + "</td></tr>").join("");
 }
 
+const LS_PPOS = "mtPaperPos", LS_PTRD = "mtPaperTrades";
+
+function paperOnChange(a) {
+  const pos = loadJSON(LS_PPOS, {}), trades = loadJSON(LS_PTRD, []);
+  const p = pos[a.sym];
+  const wants = a.state === "bullish" ? "long" : a.state === "bearish" ? "short" : null;
+  if (p && p.side !== wants) {
+    const pct = p.side === "long" ? (a.close / p.entry - 1) : (p.entry / a.close - 1);
+    trades.unshift({ name: a.name, side: p.side, entry: p.entry, exit: a.close, pct, tOpen: p.t, tClose: Date.now() });
+    delete pos[a.sym];
+  }
+  if (wants && !pos[a.sym]) pos[a.sym] = { side: wants, entry: a.close, t: Date.now(), name: a.name, pre: a.pre, d: a.d };
+  saveJSON(LS_PPOS, pos); saveJSON(LS_PTRD, trades.slice(0, 200));
+}
+
+function renderPaper(rows) {
+  const pos = loadJSON(LS_PPOS, {}), trades = loadJSON(LS_PTRD, []);
+  const bySym = new Map(rows.filter(r => r.ok).map(r => [r.sym, r]));
+  const names = [...new Set([...Object.values(pos).map(p => p.name), ...trades.map(t => t.name)])];
+  const tb = document.querySelector("#paperTable tbody");
+  if (!names.length) { tb.innerHTML = "<tr><td colspan='6' class='band'>No paper trades yet — the first signal will open one automatically.</td></tr>"; document.getElementById("paperTotals").textContent = ""; return; }
+  let totalPct = 0, totalTrades = 0, totalWins = 0;
+  tb.innerHTML = names.map(name => {
+    const symEntry = Object.entries(pos).find(([, p]) => p.name === name);
+    let openCell = "<span class='band'>—</span>", unrl = "<span class='band'>—</span>";
+    if (symEntry) {
+      const [sym, p] = symEntry;
+      const live = bySym.get(sym);
+      openCell = (p.side === "long" ? "<span class='up'>Long</span>" : "<span class='down'>Short</span>") + " @ " + (p.pre || "") + fmt(p.entry, p.d != null ? p.d : 2);
+      if (live) {
+        const u = p.side === "long" ? (live.close / p.entry - 1) : (p.entry / live.close - 1);
+        unrl = "<span class='" + (u >= 0 ? "up" : "down") + "'>" + pctf(u) + "</span>";
+      }
+    }
+    const closed = trades.filter(t => t.name === name);
+    const wins = closed.filter(t => t.pct > 0).length;
+    const cum = closed.reduce((s, t) => s + t.pct, 0);
+    totalPct += cum; totalTrades += closed.length; totalWins += wins;
+    return "<tr><td>" + name + "</td><td>" + openCell + "</td><td>" + unrl + "</td><td class='band'>" + closed.length + "</td><td class='band'>" + wins + "</td><td class='" + (cum >= 0 ? "up" : "down") + "'>" + (closed.length ? pctf(cum) : "—") + "</td></tr>";
+  }).join("");
+  document.getElementById("paperTotals").innerHTML = totalTrades === 0 ?
+    "No closed paper trades yet — judgment requires a track record." :
+    "<strong style='color:var(--text)'>All signals so far:</strong> " + totalTrades + " closed paper trades · " + totalWins + " winners (" + Math.round(100 * totalWins / totalTrades) + "%) · cumulative " +
+    "<span class='" + (totalPct >= 0 ? "up" : "down") + "'>" + pctf(totalPct) + "</span> (sum of per-trade returns, no leverage, no costs — real trading would subtract spread and funding)";
+}
+
 function checkSignals(rows) {
   const prev = loadJSON(LS_SIG, {});
   const log = loadJSON(LS_LOG, []);
@@ -336,6 +396,7 @@ function checkSignals(rows) {
     if (!a.ok) continue;
     const was = prev[a.sym];
     if (was !== undefined && was !== a.state) {
+      paperOnChange(a);
       log.unshift({ t: Date.now(), name: a.name, state: a.state, lean: a.lean });
       changed = true;
       window.__mtBeep(); window.__mtFlash(a.name + " " + a.state);
@@ -434,10 +495,64 @@ function openDetail(sym) {
   c.appendChild(f);
   document.getElementById("detailModal").style.display = "block";
   document.body.style.overflow = "hidden";
+  // bullish/bearish gauge widget for this symbol
+  const g = document.getElementById("dGauge");
+  g.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "tradingview-widget-container";
+  wrap.style.height = "100%";
+  const s = document.createElement("script");
+  s.src = "https://s3.tradingview.com/external-embedding/embed-widget-technical-analysis.js";
+  s.async = true;
+  s.text = JSON.stringify({ symbol: sym, interval: "1h", colorTheme: "dark", isTransparent: false,
+    width: "100%", height: "100%", locale: "en", showIntervalTabs: true, displayMode: "single" });
+  wrap.appendChild(s);
+  g.appendChild(wrap);
+  loadIndicators(a);
 }
+
+async function loadIndicators(a) {
+  const tb = document.querySelector("#dInd tbody");
+  tb.innerHTML = "<tr><td class='band'>Loading indicators&hellip;</td></tr>";
+  try {
+    const cols = ["close","RSI|60","MACD.macd|60","MACD.signal|60","EMA20|60","SMA50|60","SMA200|60","Recommend.Other|60","Recommend.MA|60","Recommend.All|60"];
+    const r = await fetch("https://scanner.tradingview.com/" + (a.mkt === "futures" ? "futures" : "global") + "/scan", {
+      method: "POST", body: JSON.stringify({ symbols: { tickers: [a.sym] }, columns: cols }) });
+    const j = await r.json();
+    const row = (j.data || [])[0];
+    if (!row) throw new Error("no data");
+    const d = {}; cols.forEach((c, i) => d[c] = row.d[i]);
+    const px = d["close"];
+    const verdict = (cond, revCond) => cond == null ? ["n/a", "band"] : cond ? ["Bullish", "up"] : (revCond === undefined || revCond) ? ["Bearish", "down"] : ["Neutral", "band"];
+    const rows = [];
+    const add = (name, value, v) => rows.push("<tr><td>" + name + "</td><td class='band'>" + value + "</td><td class='" + v[1] + "'>" + v[0] + "</td></tr>");
+    if (d["RSI|60"] != null) {
+      const rsi = d["RSI|60"];
+      add("RSI (14)", rsi.toFixed(1), rsi > 70 ? ["Overbought", "down"] : rsi < 30 ? ["Oversold", "up"] : rsi >= 50 ? ["Leans bullish", "up"] : ["Leans bearish", "down"]);
+    } else add("RSI (14)", "n/a", ["n/a", "band"]);
+    if (d["MACD.macd|60"] != null && d["MACD.signal|60"] != null)
+      add("MACD vs signal", d["MACD.macd|60"].toFixed(3) + " / " + d["MACD.signal|60"].toFixed(3), verdict(d["MACD.macd|60"] > d["MACD.signal|60"]));
+    else add("MACD", "n/a", ["n/a", "band"]);
+    const vsMa = (label, ma) => { if (ma == null || px == null) { add(label, "n/a", ["n/a", "band"]); return; }
+      add(label, a.pre + fmt(ma, a.d), verdict(px > ma)); };
+    vsMa("Price vs EMA 20", d["EMA20|60"]);
+    vsMa("Price vs SMA 50", d["SMA50|60"]);
+    vsMa("Price vs SMA 200", d["SMA200|60"]);
+    const grp = (name, v) => { const [w, c] = v == null ? ["n/a", "band"] : v > 0.1 ? ["Bullish", "up"] : v < -0.1 ? ["Bearish", "down"] : ["Neutral", "band"];
+      rows.push("<tr><td><strong>" + name + "</strong></td><td class='band'>" + (v == null ? "" : v.toFixed(2)) + "</td><td class='" + c + "'><strong>" + w + "</strong></td></tr>"); };
+    grp("Oscillators overall", d["Recommend.Other|60"]);
+    grp("Moving averages overall", d["Recommend.MA|60"]);
+    grp("Combined", d["Recommend.All|60"]);
+    tb.innerHTML = rows.join("");
+  } catch (e) {
+    tb.innerHTML = "<tr><td class='band'>Indicators unavailable for this symbol (" + e.message + ")</td></tr>";
+  }
+}
+
 function closeDetail() {
   document.getElementById("detailModal").style.display = "none";
   document.getElementById("dChart").innerHTML = "";
+  document.getElementById("dGauge").innerHTML = "";
   document.body.style.overflow = "";
 }
 window.closeDetail = closeDetail;
@@ -481,6 +596,7 @@ async function tick(first) {
     renderAssets(rows);
     renderMacro(macro, rows);
     checkSignals(rows);
+    renderPaper(rows);
     document.getElementById("updated").textContent = "Live: " + new Date().toLocaleTimeString() + " · refreshes every 60s";
     if (first) {
       document.getElementById("status").style.display = "none";
@@ -493,6 +609,12 @@ async function tick(first) {
         if (card) openDetail(card.getAttribute("data-sym"));
       });
       document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
+      document.getElementById("paperReset").addEventListener("click", () => {
+        if (confirm("Erase the entire paper-trade record on this device?")) {
+          try { localStorage.removeItem(LS_PPOS); localStorage.removeItem(LS_PTRD); } catch (e) {}
+          renderPaper(lastRows);
+        }
+      });
     }
   } catch (e) {
     if (first) document.getElementById("status").innerHTML = "<span class='err'>Could not load data: " + e.message + "</span>";
