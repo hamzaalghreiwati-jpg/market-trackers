@@ -30,6 +30,13 @@
   #assetGrid .card:hover { border-color: var(--accent); transform: translateY(-2px); }
   .pnum { font-size: 20px; font-weight: 650; }
   .pl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; }
+  .amn { font-size: 9.5px; padding: 1px 7px; border-radius: 10px; background: rgba(255,255,255,.07); color: var(--muted); margin-left: 6px; letter-spacing: .5px; vertical-align: middle; }
+  details.sec { margin: 16px 0 8px; }
+  details.sec > summary { list-style: none; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); border-left: 3px solid var(--accent); padding-left: 9px; cursor: pointer; user-select: none; margin-bottom: 10px; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary::before { content: "\25B8  "; color: var(--accent); }
+  details.sec[open] > summary::before { content: "\25BE  "; }
+  details.sec > summary:hover { color: var(--text); }
   .card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
   .card .value { font-size: 23px; font-weight: 650; font-variant-numeric: tabular-nums; }
   .card .sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
@@ -106,10 +113,11 @@ button.act { background: linear-gradient(135deg, var(--accent), color-mix(in srg
     <div class="section-title">All commodities <span class="pill">click any card for its live chart &amp; what drives it</span></div>
     <div class="grid" id="assetGrid"></div>
 
-    <div class="section-title">Macro conditions <span class="pill">the inputs professional systems watch &mdash; context, not signals</span></div>
+    <details class="sec"><summary>Macro conditions <span class="pill">dollar &middot; yields &middot; VIX &middot; gold/silver ratio</span></summary>
     <div class="grid" id="macroGrid" style="margin-bottom:16px"></div>
+    </details>
 
-    <div class="section-title">Jarvis &mdash; on-demand news center <span class="pill">press refresh for this minute's headlines</span></div>
+    <details class="sec"><summary>Jarvis &mdash; news center <span class="pill">BBC &middot; CNN &middot; refresh on demand</span></summary>
     <div class="card" style="margin-bottom:12px">
       <button class="act" id="jarvisBtn">Refresh news now</button>
       <a href="https://amana.app" target="_blank" rel="noopener" style="margin-left:10px;color:var(--accent);font-size:13px;text-decoration:none;font-weight:600">Open amana &nearr;</a>
@@ -125,6 +133,7 @@ button.act { background: linear-gradient(135deg, var(--accent), color-mix(in srg
       <div class="tv-embed" style="height:300px"><div id="jv_wti" style="height:100%"></div></div>
       <div class="tv-embed" style="height:300px"><div id="jv_brent" style="height:100%"></div></div>
     </div>
+    </details>
 
     <div id="detailModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,.75);z-index:50;padding:4vh 4vw" onclick="if(event.target===this)closeDetail()">
       <div class="card" style="max-width:960px;margin:0 auto;max-height:92vh;overflow-y:auto">
@@ -147,23 +156,24 @@ button.act { background: linear-gradient(135deg, var(--accent), color-mix(in srg
       </div>
     </div>
 
-    <div class="section-title">Paper signal scorecard <span class="pill">simulation &mdash; audits the signals with zero money at risk</span></div>
+    <details class="sec" open><summary>Paper signal scorecard <span class="pill">simulation &mdash; audits the signals, zero money at risk</span></summary>
     <div class="card" style="margin-bottom:16px">
       <div class="sub" style="margin-bottom:10px">Every bullish signal opens a <em>hypothetical</em> long at that moment's price; every bearish signal a hypothetical short. When the signal ends, the paper trade closes and the result is recorded here. This is how you find out whether the signals deserve any trust &mdash; before a single dirham touches them. Record lives on this device. <button class="act" id="paperReset" style="padding:4px 12px;font-size:12px;margin-left:8px">Reset record</button></div>
       <table id="paperTable"><thead><tr><th>Asset</th><th>Open paper position</th><th>Unrealized</th><th>Closed trades</th><th>Wins</th><th>Cumulative %</th></tr></thead><tbody></tbody></table>
       <div class="sub" id="paperTotals" style="margin-top:10px"></div>
     </div>
+    </details>
 
-    <div class="section-title">Signal log <span class="pill">stored on this device</span></div>
+    <details class="sec"><summary>Signal log <span class="pill">every flip, stored on this device</span></summary>
     <div class="card" style="margin-bottom:16px">
       <table id="logTable"><thead><tr><th>Time</th><th>Asset</th><th>Signal</th><th>Score</th></tr></thead><tbody></tbody></table>
     </div>
+    </details>
 
-    <div class="section-title">Silver &mdash; live chart <span class="pill">TradingView · 30m</span></div>
+    <details class="sec"><summary>Big charts &mdash; silver &amp; Brent <span class="pill">TradingView · 30m</span></summary>
     <div class="tv-embed" style="height:420px;margin-bottom:14px"><div id="tv_silver" style="height:100%"></div></div>
-
-    <div class="section-title">Brent crude &mdash; live chart <span class="pill">TradingView · 30m</span></div>
     <div class="tv-embed" style="height:420px;margin-bottom:14px"><div id="tv_brent" style="height:100%"></div></div>
+    </details>
 
     <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <span>Data: TradingView (quotes, indicator consensus, charts) &middot; BBC &amp; CNN via Jina Reader (headlines)</span>
@@ -247,6 +257,13 @@ async function scanMarket(market, tickers) {
   if (!r.ok) throw new Error("tradingview " + market + " -> HTTP " + r.status);
   return (await r.json()).data || [];
 }
+
+// amana instrument tickers (from amana.app public commodities page + the amana app)
+const AMANA = {
+  "Gold": "XAUUSD", "Silver": "XAGUSD", "Platinum": "XPTUSD", "Palladium": "XPDUSD",
+  "WTI Crude": "WTIUSD", "Brent Crude": "BRENTUSD", "Natural Gas": "NG",
+  "Wheat": "WM", "Soybeans": "SM", "Coffee": "KC5N"
+};
 
 const DRIVERS = {
   "Gold": "Moves with real interest rates (inverse), the US dollar (inverse), central-bank buying, and fear — wars, crises, inflation scares. The classic safe haven.",
@@ -336,9 +353,10 @@ function renderAssets(rows) {
       a.state === "bearish" ? "<span class='sig bear'>Bearish signal</span>" : "<span class='sig neut'>No signal · mixed</span>";
     const tf = (k, v) => "<div><div class='k'>" + k + "</div><div class='" + cls(v) + "'>" + ratingWord(v) + (v != null ? " (" + v.toFixed(2) + ")" : "") + "</div></div>";
     const delayed = a.mkt === "futures" ? " <span class='band' style='font-size:10px'>delayed ~10m</span>" : "";
+    const amn = AMANA[a.name] ? "<span class='amn'>amana: " + AMANA[a.name] + "</span>" : "<span class='amn' style='opacity:.55'>not on amana</span>";
     const ltWord = a.ltLean == null ? "n/a" : a.ltLean > 0.3 ? "Uptrend" : a.ltLean < -0.3 ? "Downtrend" : "Sideways / mixed";
     const ltCls = a.ltLean == null ? "band" : a.ltLean > 0.3 ? "up" : a.ltLean < -0.3 ? "down" : "band";
-    return "<div class='card' data-sym='" + a.sym + "'><div class='label'>" + a.name + " <span class='band'>" + a.unit + "</span>" + delayed + "</div>" +
+    return "<div class='card' data-sym='" + a.sym + "'><div class='label'>" + a.name + " <span class='band'>" + a.unit + "</span>" + delayed + amn + "</div>" +
       "<div class='value'>" + a.pre + fmt(a.close, a.d) + "</div>" +
       "<div class='sub' style='margin-top:8px;text-transform:uppercase;font-size:10px;letter-spacing:.5px'>Short-term consensus</div>" +
       "<div class='tfrow'>" + tf("1h", a.h1) + tf("4h", a.h4) + tf("1d", a.d1) + "</div>" +
@@ -502,7 +520,8 @@ function openDetail(sym) {
   const a = lastRows.find(r => r.sym === sym);
   if (!a) return;
   document.getElementById("dTitle").textContent = a.name;
-  document.getElementById("dPrice").textContent = a.ok ? a.pre + fmt(a.close, a.d) + " " + a.unit : "";
+  document.getElementById("dPrice").innerHTML = (a.ok ? a.pre + fmt(a.close, a.d) + " " + a.unit : "") +
+    (AMANA[a.name] ? " <span class='amn'>amana ticker: " + AMANA[a.name] + "</span>" : " <span class='amn' style='opacity:.55'>not listed on amana</span>");
   document.getElementById("dDrivers").innerHTML = "<strong style='color:var(--text)'>What moves it:</strong> " + (DRIVERS[a.name] || "");
   const w = (v) => v == null ? "n/a" : ratingWord(v) + " (" + v.toFixed(2) + ")";
   document.getElementById("dConsensus").innerHTML =
