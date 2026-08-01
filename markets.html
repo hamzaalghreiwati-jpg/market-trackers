@@ -26,6 +26,10 @@
   #updated { color: var(--muted); font-size: 12px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.12); }
+  #assetGrid .card { cursor: pointer; transition: border-color .15s, transform .15s; }
+  #assetGrid .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .pnum { font-size: 20px; font-weight: 650; }
+  .pl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; }
   .card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
   .card .value { font-size: 23px; font-weight: 650; font-variant-numeric: tabular-nums; }
   .card .sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
@@ -74,6 +78,14 @@
       <div class="sub" style="margin-top:10px">Watches all 19 commodities. Fires when any asset's combined 1h/4h/daily indicator consensus crosses into bullish (&gt; +0.30) or bearish (&lt; &minus;0.30) territory, checked every 60s. Alerts only work while this page is open in a tab &mdash; a static site cannot push to a closed browser. Futures quotes are delayed ~10 minutes; CFD quotes are live. A signal describes the current trend consensus; it has no proven predictive power and is not a recommendation.</div>
     </div>
 
+    <div class="card" id="pulse" style="margin-bottom:16px;display:flex;gap:24px;flex-wrap:wrap;align-items:center"></div>
+
+    <div class="section-title">All commodities <span class="pill">click any card for its live chart &amp; what drives it</span></div>
+    <div class="grid" id="assetGrid"></div>
+
+    <div class="section-title">Macro conditions <span class="pill">the inputs professional systems watch &mdash; context, not signals</span></div>
+    <div class="grid" id="macroGrid" style="margin-bottom:16px"></div>
+
     <div class="section-title">Jarvis &mdash; on-demand news center <span class="pill">press refresh for this minute's headlines</span></div>
     <div class="card" style="margin-bottom:12px">
       <button class="act" id="jarvisBtn">Refresh news now</button>
@@ -91,10 +103,19 @@
       <div class="tv-embed" style="height:300px"><div id="jv_brent" style="height:100%"></div></div>
     </div>
 
-    <div class="section-title">Macro conditions <span class="pill">the inputs professional systems watch &mdash; context, not signals</span></div>
-    <div class="grid" id="macroGrid" style="margin-bottom:16px"></div>
-
-    <div class="grid" id="assetGrid"></div>
+    <div id="detailModal" style="display:none;position:fixed;inset:0;background:rgba(8,9,12,.75);z-index:50;padding:4vh 4vw" onclick="if(event.target===this)closeDetail()">
+      <div class="card" style="max-width:960px;margin:0 auto;max-height:92vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+          <div><span class="value" id="dTitle">&ndash;</span> <span class="band" id="dPrice"></span></div>
+          <div><a href="https://amana.app" target="_blank" rel="noopener" style="color:var(--accent);font-size:13px;text-decoration:none;font-weight:600;margin-right:14px">Trade on amana &nearr;</a>
+          <button class="act" onclick="closeDetail()" style="padding:6px 14px">Close</button></div>
+        </div>
+        <div class="sub" id="dDrivers" style="margin:10px 0 6px;line-height:1.6"></div>
+        <div class="sub" id="dConsensus" style="margin-bottom:12px"></div>
+        <div class="tv-embed" style="height:440px"><div id="dChart" style="height:100%"></div></div>
+        <div class="sub" style="margin-top:10px">Chart: TradingView, 30-minute candles. Consensus describes the current trend, not the next move. Not financial advice.</div>
+      </div>
+    </div>
 
     <div class="section-title">Signal log <span class="pill">stored on this device</span></div>
     <div class="card" style="margin-bottom:16px">
@@ -190,6 +211,28 @@ async function scanMarket(market, tickers) {
   return (await r.json()).data || [];
 }
 
+const DRIVERS = {
+  "Gold": "Moves with real interest rates (inverse), the US dollar (inverse), central-bank buying, and fear — wars, crises, inflation scares. The classic safe haven.",
+  "Silver": "Half precious metal, half industrial input (solar, electronics). Follows gold but swings harder both ways; watch the gold/silver ratio for relative value.",
+  "Platinum": "Driven by auto-catalyst demand (diesel), South African supply disruptions, and substitution with palladium.",
+  "Palladium": "Gasoline-vehicle catalysts dominate demand; Russia dominates supply. Thin market — expect violent moves and wide broker spreads.",
+  "Copper": "The economy's thermometer: China construction, EVs, and the grid. Rises on growth optimism, falls on recession fear.",
+  "WTI Crude": "US benchmark oil. Driven by OPEC+ decisions, US shale output, EIA inventories (Wednesdays 10:30 ET), and global demand.",
+  "Brent Crude": "Global seaborne benchmark. Same drivers as WTI plus Middle East geopolitics weigh heavier; the Brent–WTI spread signals US vs world balance.",
+  "Natural Gas": "Weather is king — heating and cooling demand — plus storage levels (Thursday EIA report) and LNG exports. Notoriously violent.",
+  "Gasoline (RBOB)": "Follows crude plus refinery margins; driving season (summer) and refinery outages move it independently.",
+  "Heating Oil": "Follows crude plus winter weather in the US Northeast; also tracks global diesel demand.",
+  "Corn": "US Midwest weather, planting/harvest reports (USDA), ethanol demand, and export competition from Brazil.",
+  "Wheat": "Weather in the US, Black Sea supply (Russia/Ukraine — geopolitics matters here), and global food security demand.",
+  "Soybeans": "China import demand dominates; US and Brazil weather set supply. Trade politics can move it overnight.",
+  "Coffee": "Brazil frost and drought risk, Vietnam robusta supply, and shipping costs. Weather headlines cause spikes.",
+  "Sugar": "Brazil harvest and ethanol economics (cane can make either), India export policy, and oil prices.",
+  "Cotton": "China demand, US and India crops, and consumer clothing demand as an economic signal.",
+  "Cocoa": "West Africa (Ivory Coast/Ghana) weather and disease pressure — 60%+ of world supply from two countries.",
+  "Live Cattle": "US herd size (multi-year cycles), feed-corn costs, and consumer beef demand.",
+  "Lean Hogs": "Feed costs, disease outbreaks (swine fever), and China import demand."
+};
+
 const MACRO_SYMS = ["TVC:DXY", "TVC:VIX", "TVC:US10Y", "TVC:US02Y"];
 
 async function fetchAll() {
@@ -236,7 +279,18 @@ function renderMacro(macro, rows) {
 const ratingWord = (v) => v == null ? "n/a" : v > 0.5 ? "Str buy" : v > 0.1 ? "Buy" : v < -0.5 ? "Str sell" : v < -0.1 ? "Sell" : "Neutral";
 const cls = (v) => v > 0.1 ? "up" : v < -0.1 ? "down" : "";
 
+let lastRows = [];
 function renderAssets(rows) {
+  lastRows = rows;
+  const okRows = rows.filter(r => r.ok);
+  const bulls = okRows.filter(r => r.state === "bullish").length;
+  const bears = okRows.filter(r => r.state === "bearish").length;
+  document.getElementById("pulse").innerHTML =
+    "<div><div class='pl'>Market pulse</div><div class='pnum'>" + okRows.length + " <span class='band' style='font-size:13px'>tracked</span></div></div>" +
+    "<div><div class='pl'>Bullish signals</div><div class='pnum up'>" + bulls + "</div></div>" +
+    "<div><div class='pl'>Bearish signals</div><div class='pnum down'>" + bears + "</div></div>" +
+    "<div><div class='pl'>Mixed / quiet</div><div class='pnum band'>" + (okRows.length - bulls - bears) + "</div></div>" +
+    "<div class='sub' style='flex:1;min-width:200px'>Signals = short-term indicator consensus beyond &plusmn;0.30. A quiet board is normal; a loud one is information.</div>";
   const bySym = new Map(rows.map(r => [r.sym, r]));
   const card = (a0) => {
     const a = bySym.get(a0.sym);
@@ -247,7 +301,7 @@ function renderAssets(rows) {
     const delayed = a.mkt === "futures" ? " <span class='band' style='font-size:10px'>delayed ~10m</span>" : "";
     const ltWord = a.ltLean == null ? "n/a" : a.ltLean > 0.3 ? "Uptrend" : a.ltLean < -0.3 ? "Downtrend" : "Sideways / mixed";
     const ltCls = a.ltLean == null ? "band" : a.ltLean > 0.3 ? "up" : a.ltLean < -0.3 ? "down" : "band";
-    return "<div class='card'><div class='label'>" + a.name + " <span class='band'>" + a.unit + "</span>" + delayed + "</div>" +
+    return "<div class='card' data-sym='" + a.sym + "'><div class='label'>" + a.name + " <span class='band'>" + a.unit + "</span>" + delayed + "</div>" +
       "<div class='value'>" + a.pre + fmt(a.close, a.d) + "</div>" +
       "<div class='sub' style='margin-top:8px;text-transform:uppercase;font-size:10px;letter-spacing:.5px'>Short-term consensus</div>" +
       "<div class='tfrow'>" + tf("1h", a.h1) + tf("4h", a.h4) + tf("1d", a.d1) + "</div>" +
@@ -360,6 +414,34 @@ async function fetchHeadlines() {
     "<span class='band'>No headlines available.</span>";
 }
 
+function openDetail(sym) {
+  const a = lastRows.find(r => r.sym === sym);
+  if (!a) return;
+  document.getElementById("dTitle").textContent = a.name;
+  document.getElementById("dPrice").textContent = a.ok ? a.pre + fmt(a.close, a.d) + " " + a.unit : "";
+  document.getElementById("dDrivers").innerHTML = "<strong style='color:var(--text)'>What moves it:</strong> " + (DRIVERS[a.name] || "");
+  const w = (v) => v == null ? "n/a" : ratingWord(v) + " (" + v.toFixed(2) + ")";
+  document.getElementById("dConsensus").innerHTML =
+    "<strong style='color:var(--text)'>Consensus now:</strong> 1h " + w(a.h1) + " &middot; 4h " + w(a.h4) + " &middot; 1d " + w(a.d1) +
+    " &middot; 1w " + w(a.w1) + " &middot; 1mo " + w(a.m1) +
+    (a.mkt === "futures" ? " <span class='band'>(futures: daily+ only, ~10m delay)</span>" : "");
+  const c = document.getElementById("dChart");
+  c.innerHTML = "";
+  const f = document.createElement("iframe");
+  f.src = "https://s.tradingview.com/widgetembed/?symbol=" + encodeURIComponent(sym) +
+    "&interval=30&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&withdateranges=1&save_image=0";
+  f.style.cssText = "width:100%;height:100%;border:0";
+  c.appendChild(f);
+  document.getElementById("detailModal").style.display = "block";
+  document.body.style.overflow = "hidden";
+}
+function closeDetail() {
+  document.getElementById("detailModal").style.display = "none";
+  document.getElementById("dChart").innerHTML = "";
+  document.body.style.overflow = "";
+}
+window.closeDetail = closeDetail;
+
 function mountJarvis() {
   fetchHeadlines();
   const feeds = [["jv_gold", "OANDA:XAUUSD"], ["jv_wti", "FX:USOIL"], ["jv_brent", "FX:UKOIL"]];
@@ -406,6 +488,11 @@ async function tick(first) {
       renderLog(); updateNotifUI(); embedCharts(); mountJarvis();
       document.getElementById("notifBtn").addEventListener("click", notifBtnClick);
       document.getElementById("jarvisBtn").addEventListener("click", mountJarvis);
+      document.getElementById("assetGrid").addEventListener("click", (e) => {
+        const card = e.target.closest("[data-sym]");
+        if (card) openDetail(card.getAttribute("data-sym"));
+      });
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDetail(); });
     }
   } catch (e) {
     if (first) document.getElementById("status").innerHTML = "<span class='err'>Could not load data: " + e.message + "</span>";
